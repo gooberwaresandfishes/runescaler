@@ -1,6 +1,7 @@
 #include "OSAKA.h"
 #include <string.h>
 #include <math.h>
+#include <stdio.h>
 
 #define LIVE_ENTITY_LENGTH 10
 
@@ -69,7 +70,7 @@ bool isHard;
 bool viewingStory;
 bool viewingAnalysis;
 
-float time;
+float atime;
 
 // grid ----------------------------------------------------------------------------------------------------------------
 
@@ -135,7 +136,7 @@ void liveEntUpdate(LiveEnt* ent)
 	// check for collisions with other entities
     for (int i = 0; i < LIVE_ENTITY_LENGTH; i++)
 	{
-        if (&liveEnts[i] != ent)
+        if (&liveEnts[i] != ent && liveEnts[i].initialised)
 		{
             if (checkCollision(ent, &liveEnts[i]))
             {
@@ -149,7 +150,7 @@ void liveEntUpdate(LiveEnt* ent)
 	{
         for (int y = 0; y < GRID_HEIGHT; y++)
 		{
-            if (checkTileCollision(ent, x , y))
+            if (grid[y][x] && checkTileCollision(ent, x , y))
             {
                 ent->onTileXCollision(ent, x, y);
             }
@@ -162,7 +163,7 @@ void liveEntUpdate(LiveEnt* ent)
 	// check for collisions with other entities
     for (int i = 0; i < LIVE_ENTITY_LENGTH; i++)
 	{
-        if (&liveEnts[i] != ent)
+        if (&liveEnts[i] != ent && liveEnts[i].initialised)
 		{
             if (checkCollision(ent, &liveEnts[i]))
             {
@@ -176,7 +177,7 @@ void liveEntUpdate(LiveEnt* ent)
 	{
         for (int y = 0; y < GRID_HEIGHT; y++)
 		{
-            if (checkTileCollision(ent, x , y))
+            if (grid[y][x] && checkTileCollision(ent, x , y))
             {
                 ent->onTileYCollision(ent, x, y);
             }
@@ -246,19 +247,19 @@ bool checkCollision(LiveEnt* ent, LiveEnt* collider)
 
 bool checkTileCollision(LiveEnt* ent, int tileX, int tileY)
 {
-    float entLeft = ent->x;
+    // Calculate tile boundaries directly
+    float tileLeft = tileX * TILE_SIZE;
+    float tileTop = tileY * TILE_SIZE;
+
+    // Calculate entity boundaries
     float entRight = ent->x + ent->width;
-    float entTop = ent->y;
     float entBottom = ent->y + ent->height;
 
-    float tileLeft = tileX * TILE_SIZE;
-    float tileRight = tileLeft + TILE_SIZE;
-    float tileTop = tileY * TILE_SIZE;
-    float tileBottom = tileTop + TILE_SIZE;
-
-    // true if theres no gaps between then on x or y
-    return !((entRight < tileLeft || tileRight < entLeft) || (entBottom < tileTop || tileBottom < entTop));
+    // Check for overlap (no need for tileRight and tileBottom)
+    return !(entRight <= tileLeft || ent->x >= tileLeft + TILE_SIZE ||
+             entBottom <= tileTop || ent->y >= tileTop + TILE_SIZE);
 }
+
 
 // player --------------------------------------------------------------------------------------------------------------
 
@@ -456,25 +457,6 @@ void playerOnTileXCollision(LiveEnt* ent, int tileX, int tileY)
 {
 	if (ent == selectedRune) return;
 	
-	if (grid[tileY][tileX] == 2 && ent->type != 2)
-	{
-		if (ent->type == 0)
-		{
-			initLevel = true;
-			if (isHard) currentLevel = 0;
-			PlaySound(sounds[4]);
-		}
-		else
-		{
-			ent->initialised = false;
-			ent->x= 99999999;
-			
-			PlaySound(sounds[4]);
-		}
-			
-		return;
-	}
-	
 	if (grid[tileY][tileX] == 1)
 	{
 		if (ent->dx > 0) {  // Moving right
@@ -495,11 +477,44 @@ void playerOnTileXCollision(LiveEnt* ent, int tileX, int tileY)
 		ent->dx = 0;  // Stop horizontal movement on collision
 		ent->fx = 0;  // Reset horizontal force
 	}
+	
+	if (grid[tileY][tileX] == 2 && ent->type != 2)
+	{
+		if (ent->type == 0)
+		{
+			initLevel = true;
+			if (isHard) currentLevel = 0;
+			PlaySound(sounds[4]);
+		}
+		else
+		{
+			ent->initialised = false;
+			ent->x= 99999999;
+			
+			PlaySound(sounds[4]);
+		}
+			
+		return;
+	}
+	
+	
 }
 
 void playerOnTileYCollision(LiveEnt* ent, int tileX, int tileY)
 {
 	if (ent == selectedRune) return;
+	
+	if (grid[tileY][tileX])
+	{
+		if (ent->dy > 0) {  // Falling down
+			ent->y = tileY*TILE_SIZE - ent->height - ent->dy;
+			ent->onGround = true;  // Set a flag to indicate the entity is on the ground
+		} else if (ent->dy < 0) {  // Moving up (jumping)
+			ent->y -= ent->dy;
+		}
+		ent->dy = 0;  // Stop vertical movement on collision
+		ent->fy = 0;  // Reset vertical force
+	}
 	
 	if (grid[tileY][tileX] == 2 && ent->type != 2)
 	{
@@ -519,17 +534,7 @@ void playerOnTileYCollision(LiveEnt* ent, int tileX, int tileY)
 		return;
 	}
 	
-	if (grid[tileY][tileX])
-	{
-		if (ent->dy > 0) {  // Falling down
-			ent->y = tileY*TILE_SIZE - ent->height - ent->dy;
-			ent->onGround = true;  // Set a flag to indicate the entity is on the ground
-		} else if (ent->dy < 0) {  // Moving up (jumping)
-			ent->y -= ent->dy;
-		}
-		ent->dy = 0;  // Stop vertical movement on collision
-		ent->fy = 0;  // Reset vertical force
-	}
+	
 }
 
 void runeOnXCollision(LiveEnt* ent, LiveEnt* collider)
@@ -1129,10 +1134,6 @@ void update()
 		
 			liveEntUpdate(&liveEnts[i]);
 		}
-		else
-		{
-			liveEnts[i] = (LiveEnt){0};
-		}
     }
 }
 
@@ -1222,10 +1223,7 @@ void render()
 		
 			liveEntRender(&liveEnts[i]);
 		}
-		else
-		{
-			liveEnts[i] = (LiveEnt){0};
-		}
+
     }
 	
 	switch (currentLevel)
@@ -1291,14 +1289,14 @@ void render()
 		sprintf(buffer, "level %i", currentLevel+1);
 		DrawText(buffer, 10, 775, 25, LIGHTGRAY);
 		
-		time += GetFrameTime();
+		atime += GetFrameTime();
 	}
 	
 	char buffer2[50];
 	
 	if (currentLevel < 11)
 	{
-		sprintf(buffer2, "time : %.2f", time);
+		sprintf(buffer2, "time : %.2f", atime);
 		DrawText(buffer2, 10, 805, 25, LIGHTGRAY);
 	}
 	
@@ -1312,6 +1310,7 @@ void render()
 				WHITE
 			);
 	}
+	
 }
 
 void quit()

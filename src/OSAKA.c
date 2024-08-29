@@ -34,7 +34,6 @@ void OSAKA_Init(char name[TITLE_CHARACTER_LENGTH], int width, int height)
 
 void OSAKA_InitWindow(char name[TITLE_CHARACTER_LENGTH], int width, int height, char fileName[PATH_CHARACTER_LENGTH])
 {
-	SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(width, height, name);
 
 	(IsWindowReady()) ?
@@ -77,44 +76,22 @@ void OSAKA_MainLoop(void (*init)(), void (*update)(), void (*render)(), void (*q
 {
 	init();
 	
-	// initialise buffer and resize dimensions
-	RenderTexture2D screenBuffer = LoadRenderTexture(windowWidth, windowHeight);
-	
-	Rectangle originalDimensions = { 0, 0, (float)windowWidth, -(float)windowHeight };
-	Rectangle dimensions = { 0, 0, (float)windowWidth, (float)windowHeight };
-	
 	running = true;
 	
 	while (running)
 	{	
 		running = !WindowShouldClose();
 		
-		dimensions.width = windowWidth = GetScreenWidth();
-		dimensions.height = windowHeight = GetScreenHeight();
-		
 		
 		update();
 		
-		
-		// draw to buffer
-		BeginTextureMode(screenBuffer);
-        ClearBackground(BLACK);
-		
-        render();
-		
-        EndTextureMode();
-		
-		// draw buffer to screen
 		BeginDrawing();
 		ClearBackground(BLACK);
 		
-		// draw scaled buffer
-		DrawTexturePro(screenBuffer.texture, originalDimensions, dimensions, (Vector2){ 0, 0 }, 0.0f, WHITE);
+		render();
 		
 		EndDrawing();
 	}
-	
-	UnloadRenderTexture(screenBuffer);
 	
 	quit();
 }
