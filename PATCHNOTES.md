@@ -22,3 +22,7 @@
 - better text
 - level 2 (now 3) and level 4 (now 5) boxes easier to get through
 
+### v1.1.1 (28/08/24)
+
+- web version kinda works now
+- a bit more optimized but still crappy jam code at the end of the day
